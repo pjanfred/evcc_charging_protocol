@@ -39,10 +39,7 @@ DEFAULT_OPTIONS = {
     "auto_generate": True,
     "notify_on_generate": True,
     "footnote_pauschale": "",
-    "footnote_actual": (
-        "Basis of calculation: individual household tariff. The energy charged was "
-        "recorded with the MID-certified SDM630 meter (Modbus, MID V2) built into the wallbox."
-    ),
+    "footnote_actual": "Basis of calculation: individual household tariff.",
     "include_chart": False,
 }
 
