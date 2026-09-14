@@ -72,7 +72,7 @@ messages:
 
 notify:
   created_title: "evcc Charging Cost Report created"
-  created_body: "{filename}: {sessions} charging sessions, {kwh} kWh, {amount} EUR. Available via the add-on interface or /share/evcc_ladekosten."
+  created_body: "{filename}: {sessions} charging sessions, {kwh} kWh, {amount} EUR. Available via the add-on interface or /share/evcc_charging_cost_report."
   error_title: "evcc Charging Cost Report: Error"
   error_body: "Automatic creation for {month:02d}/{year} failed: {error}"
 

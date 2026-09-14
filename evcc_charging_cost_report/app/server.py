@@ -14,11 +14,11 @@ from apscheduler.triggers.cron import CronTrigger
 import i18n
 import report
 
-logging.basicConfig(level=logging.INFO, format="[evcc-ladekosten] %(message)s")
+logging.basicConfig(level=logging.INFO, format="[evcc-charging-cost-report] %(message)s")
 log = logging.getLogger(__name__)
 
 OPTIONS_PATH = "/data/options.json"
-SHARE_DIR = "/share/evcc_ladekosten"
+SHARE_DIR = "/share/evcc_charging_cost_report"
 META_PATH = os.path.join(SHARE_DIR, ".reports_meta.json")
 TARIFFS_PATH = "/data/tariffs.json"
 TARIFF_DOCS_DIR = "/data/tariff_docs"
@@ -255,7 +255,7 @@ def notify_home_assistant(title: str, message: str) -> None:
         requests.post(
             "http://supervisor/core/api/services/persistent_notification/create",
             headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
-            json={"title": title, "message": message, "notification_id": "evcc_ladekosten"},
+            json={"title": title, "message": message, "notification_id": "evcc_charging_cost_report"},
             timeout=5,
         )
     except requests.RequestException as exc:
@@ -273,7 +273,7 @@ def _resolve_report_filename(month: int, year: int) -> str:
     is found.
     """
     meta = load_meta()
-    base = f"ladekosten_{year}_{month:02d}"
+    base = f"charging_costs_{year}_{month:02d}"
     candidate = f"{base}.pdf"
     suffix = 2
     while (
