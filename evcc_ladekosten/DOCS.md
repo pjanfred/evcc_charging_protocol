@@ -1,7 +1,5 @@
 # evcc Charging Cost Report – Documentation
 
-[🇬🇧 English](DOCS.md) | [🇩🇪 Deutsch](DOCS.de.md)
-
 ## What does this add-on do?
 
 It retrieves a month's charging sessions from your evcc instance's REST API
