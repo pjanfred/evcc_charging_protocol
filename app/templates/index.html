@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>evcc Ladekosten-Report</title>
+  <style>
+    :root {
+      --navy: #111827;
+      --navy-soft: #1f2937;
+      --accent: #2563eb;
+      --accent-soft: #eff4ff;
+      --accent-dark: #1d4ed8;
+      --grey-text: #6b7280;
+      --grey-line: #e5e7eb;
+      --stripe: #f8f9fb;
+      --bg: #f1f3f6;
+      --card-bg: #ffffff;
+      --card-border: rgba(17, 24, 39, 0.04);
+      --input-bg: #ffffff;
+      --code-bg: rgba(17, 24, 39, 0.06);
+      --footer-text: #9ca3af;
+      --topbar-text: #ffffff;
+      --topbar-sub: #c7d2fe;
+      --topbar-icon: #93c5fd;
+      --btn-text: #ffffff;
+      --ok-bg: #ecfdf3;
+      --ok-border: #10b981;
+      --ok-text: #065f46;
+      --err-bg: #fef2f2;
+      --err-border: #ef4444;
+      --err-text: #991b1b;
+      --radius: 12px;
+    }
+
+    /* Die Add-on-Oberfläche läuft in einem Ingress-iFrame und hat daher
+       keinen Zugriff auf das aktuell gewählte Home-Assistant-Theme (das
+       ist eine Browser-Einschränkung, keine Home-Assistant-Einstellung).
+       Als bestmögliche Annäherung folgt sie stattdessen der System-/
+       Browser-Präferenz für helles oder dunkles Farbschema. */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --navy-soft: #e5e7eb;
+        --accent: #60a5fa;
+        --accent-soft: rgba(96, 165, 250, 0.16);
+        --accent-dark: #3b82f6;
+        --btn-text: #0b0f1a;
+        --grey-text: #9aa4b2;
+        --grey-line: #2b3446;
+        --stripe: #1a2130;
+        --bg: #0b0f1a;
+        --card-bg: #141a26;
+        --card-border: #232b3b;
+        --input-bg: #101623;
+        --code-bg: rgba(255, 255, 255, 0.08);
+        --footer-text: #6b7280;
+        --ok-bg: rgba(16, 185, 129, 0.14);
+        --ok-text: #6ee7b7;
+        --err-bg: rgba(239, 68, 68, 0.14);
+        --err-text: #fca5a5;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--navy-soft);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .topbar {
+      background: var(--navy);
+      padding: 22px 28px 26px;
+      position: relative;
+    }
+    .topbar::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 3px;
+      background: var(--accent);
+    }
+    .topbar h1 {
+      margin: 0;
+      color: var(--topbar-text);
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .topbar h1 svg { flex: none; }
+    .topbar h1 svg path { fill: var(--topbar-icon); }
+    .topbar .sub {
+      margin-top: 4px;
+      color: var(--topbar-sub);
+      font-size: 0.85rem;
+    }
+
+    .wrap {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 24px 26px;
+      margin-bottom: 22px;
+      box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 1px 8px rgba(17, 24, 39, 0.05);
+      border: 1px solid var(--card-border);
+    }
+
+    .card h2 {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--navy-soft);
+      margin: 0 0 18px;
+    }
+
+    .msg {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 18px;
+      font-size: 0.9rem;
+      border-left: 3px solid transparent;
+    }
+    .msg.ok { background: var(--ok-bg); color: var(--ok-text); border-left-color: var(--ok-border); }
+    .msg.err { background: var(--err-bg); color: var(--err-text); border-left-color: var(--err-border); }
+
+    label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--grey-text);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 9px 11px;
+      border: 1px solid var(--grey-line);
+      border-radius: 8px;
+      font-size: 0.92rem;
+      color: var(--navy-soft);
+      background: var(--input-bg);
+      font-family: inherit;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .row { display: flex; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+    .row > div { flex: 1; min-width: 140px; }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0 14px;
+    }
+    .checkbox-label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: normal;
+      color: var(--navy-soft);
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .field-hint {
+      background: var(--stripe);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--grey-text);
+      font-size: 0.78rem;
+      line-height: 1.5;
+      margin: 4px 0 18px;
+    }
+    .field-hint code {
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: var(--btn-text);
+      border: none;
+      padding: 11px 22px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button.primary:hover { background: var(--accent-dark); }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--grey-text);
+      padding: 0 10px 10px;
+      border-bottom: 1px solid var(--grey-line);
+    }
+    th.center, td.center { text-align: center; }
+    tbody td {
+      padding: 12px 10px;
+      font-size: 0.88rem;
+      border-bottom: 1px solid var(--grey-line);
+      color: var(--navy-soft);
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--stripe); }
+
+    a.dl {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+    a.dl:hover { text-decoration: underline; }
+
+    .hint-text { color: var(--grey-text); font-size: 0.82rem; }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .inline-form { margin: 0; display: inline; }
+
+    button.del-btn {
+      background: transparent;
+      color: var(--grey-text);
+      border: 1px solid var(--grey-line);
+      padding: 6px 12px;
+      border-radius: 7px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    button.del-btn:hover { color: var(--err-text); border-color: var(--err-border); background: var(--err-bg); }
+
+    .empty-state {
+      text-align: center;
+      padding: 34px 20px;
+      border: 1.5px dashed var(--grey-line);
+      border-radius: 10px;
+      color: var(--grey-text);
+      font-size: 0.88rem;
+    }
+
+    .footer-note {
+      text-align: center;
+      color: var(--footer-text);
+      font-size: 0.75rem;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 2L4 14H11L10 22L20 9H13L14 2Z"/>
+      </svg>
+      Ladekosten-Report
+    </h1>
+    <div class="sub">Nachweis der evcc-Ladevorgänge (inkl. Zählerständen) für die Erstattung durch den Arbeitgeber</div>
+  </div>
+
+  <div class="wrap">
+    {% if message %}<div class="msg ok">{{ message }}</div>{% endif %}
+    {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
+
+    <div class="card">
+      <h2>Neuen Report erstellen</h2>
+      <form method="post" action="generate">
+        <div class="row">
+          <div>
+            <label for="month">Monat</label>
+            <select id="month" name="month">
+              {% for m in range(1, 13) %}
+              <option value="{{ m }}" {% if m == default_month %}selected{% endif %}>{{ "%02d"|format(m) }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="year">Jahr</label>
+            <input type="number" id="year" name="year" value="{{ default_year }}">
+          </div>
+          <div>
+            <label for="method">Methode</label>
+            <select id="method" name="method">
+              <option value="pauschale" {% if opts.method == "pauschale" %}selected{% endif %}>Strompreispauschale</option>
+              <option value="actual" {% if opts.method == "actual" %}selected{% endif %}>Tatsächliche Kosten</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="employee">Mitarbeiter/in</label>
+            <input type="text" id="employee" name="employee" value="{{ opts.employee }}" placeholder="Name für den Report-Header">
+          </div>
+          <div>
+            <label for="vehicle">Fahrzeug</label>
+            <input type="text" id="vehicle" name="vehicle" value="{{ opts.vehicle }}" placeholder="z. B. Seat, WI-XX 1234">
+          </div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="include_chart" name="include_chart">
+          <label for="include_chart" class="checkbox-label">Verlaufsdiagramm im PDF mit ausgeben</label>
+        </div>
+        <div class="field-hint">
+          evcc-Instanz: <code>{{ opts.evcc_url }}</code> · Fahrzeugfilter: <code>{{ opts.vehicles|join(", ") }}</code><br>
+          Änderungen daran bitte über die Add-on-Konfiguration vornehmen.
+        </div>
+        <button type="submit" class="primary">PDF-Report erstellen</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Tarifhistorie (für "Tatsächliche Kosten")</h2>
+      <div class="field-hint">
+        Hier hinterlegte Zeiträume gelten ab dem jeweiligen Startdatum, bis der nächste Eintrag greift.
+        So werden auch Tarifwechsel mitten im Monat korrekt pro Ladevorgang berücksichtigt. Optional kann
+        pro Zeitraum ein Beleg (PDF, z. B. Stromvertrag oder Preisanpassungsschreiben) hochgeladen werden –
+        dieser wird jedem betroffenen Report automatisch als Anlage angehängt.
+      </div>
+      {% if tariffs %}
+      <table>
+        <thead>
+          <tr><th>Gültig ab</th><th>Preis (€/kWh)</th><th>Beleg</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for t in tariffs %}
+          <tr>
+            <td>{{ t.start_date_display }}</td>
+            <td>{{ t.price_display }}</td>
+            <td>
+              {% if t.has_document %}
+              <a class="dl" href="tariffs/doc/{{ t.start_date_iso }}" target="_blank">{{ t.document_name }}</a>
+              <form class="inline-form" method="post" action="tariffs/delete_doc" onsubmit="return confirm('Beleg für Tarif ab {{ t.start_date_display }} wirklich entfernen?');">
+                <input type="hidden" name="start_date" value="{{ t.start_date_iso }}">
+                <button type="submit" class="del-btn">Entfernen</button>
+              </form>
+              {% else %}
+              <span class="hint-text">– kein Beleg –</span>
+              {% endif %}
+            </td>
+            <td>
+              <form class="inline-form" method="post" action="tariffs/delete" onsubmit="return confirm('Tarifeintrag ab {{ t.start_date_display }} wirklich löschen?');">
+                <input type="hidden" name="start_date" value="{{ t.start_date_iso }}">
+                <button type="submit" class="del-btn">Löschen</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">Noch keine Tarifzeiträume hinterlegt.</div>
+      {% endif %}
+
+      <form method="post" action="tariffs/add" enctype="multipart/form-data" class="row" style="margin-top: 14px; align-items: flex-end;">
+        <div>
+          <label for="tariff_start_date">Gültig ab</label>
+          <input type="date" id="tariff_start_date" name="start_date" required>
+        </div>
+        <div>
+          <label for="tariff_price">Preis (€/kWh)</label>
+          <input type="text" id="tariff_price" name="price" placeholder="z. B. 0,2614" required>
+        </div>
+        <div>
+          <label for="tariff_document">Beleg (PDF, optional)</label>
+          <input type="file" id="tariff_document" name="document" accept="application/pdf">
+        </div>
+        <div style="flex: 0 0 auto;">
+          <button type="submit" class="primary">Hinzufügen</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Vorhandene Reports</h2>
+      {% if reports %}
+      <table>
+        <thead>
+          <tr>
+            <th>Datei</th><th>Erstellt</th><th>Größe</th><th></th><th class="center">Eingereicht</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reports %}
+          <tr>
+            <td>{{ r.name }}</td>
+            <td>{{ r.modified }}</td>
+            <td>{{ r.size_kb }} KB</td>
+            <td><a class="dl" href="download/{{ r.name }}">Download</a></td>
+            <td class="center">
+              <form class="inline-form" method="post" action="toggle_submitted">
+                <input type="hidden" name="filename" value="{{ r.name }}">
+                <input type="checkbox" onchange="this.form.submit()" {% if r.submitted %}checked{% endif %}>
+              </form>
+            </td>
+            <td>
+              <form class="inline-form" method="post" action="delete" onsubmit="return confirm('Report {{ r.name }} wirklich löschen?');">
+                <input type="hidden" name="filename" value="{{ r.name }}">
+                <button type="submit" class="del-btn">Löschen</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">Noch keine Reports erstellt.</div>
+      {% endif %}
+    </div>
+
+    <div class="footer-note">evcc Ladekosten-Report · Home Assistant Add-on</div>
+  </div>
+</body>
+</html>
