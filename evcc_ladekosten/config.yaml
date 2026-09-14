@@ -17,12 +17,11 @@ map:
   - share:rw
 options:
   evcc_url: "http://homeassistant.local:7070"
-  vehicles:
-    - "Seat"
+  vehicles: []
   method: "pauschale"
-  rate_ct_per_kwh: 34.0
-  employee: "Jan"
-  vehicle: "Seat"
+  rate_ct_per_kwh: 0.0
+  employee: ""
+  vehicle: ""
   language: "en"
   auto_generate: true
   notify_on_generate: true

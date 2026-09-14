@@ -30,11 +30,11 @@ DEFAULT_TARIFF_SEED = [{"start_date": "2020-01-01", "price": 0.2614}]
 
 DEFAULT_OPTIONS = {
     "evcc_url": "http://homeassistant.local:7070",
-    "vehicles": ["Seat"],
+    "vehicles": [],
     "method": "pauschale",
-    "rate_ct_per_kwh": 34.0,
-    "employee": "Jan",
-    "vehicle": "Seat",
+    "rate_ct_per_kwh": 0.0,
+    "employee": "",
+    "vehicle": "",
     "language": "en",
     "auto_generate": True,
     "notify_on_generate": True,
