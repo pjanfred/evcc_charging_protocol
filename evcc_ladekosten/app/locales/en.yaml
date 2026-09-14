@@ -58,6 +58,7 @@ messages:
   file_not_found: "File not found or invalid: {filename}"
   report_deleted: "Report {filename} deleted."
   delete_failed: "Delete failed: {error}"
+  delete_blocked_submitted: "Report {filename} is marked as submitted and cannot be deleted."
   tariff_saved: "Tariff from {date} saved: {price} €/kWh."
   tariff_doc_uploaded: " Receipt uploaded."
   invalid_input: "Invalid input (date: '{date}', price: '{price}'): {error}"

@@ -112,7 +112,7 @@ own entries.
 Via the web interface you can also override month/year, method, employee and
 vehicle for a single report without changing the configuration.
 
-**Preconfigured defaults for this setup:** `evcc_url: http://evcc.local:7070`,
+**Preconfigured defaults for this setup:** `evcc_url: http://homeassistant.local:7070`,
 `vehicles: ["Seat"]` (the title of your vehicle in the evcc config). Adjust
 this if your evcc config changes (e.g. a second vehicle or a vehicle
 change).
