@@ -16,7 +16,7 @@ homeassistant_api: true
 map:
   - share:rw
 options:
-  evcc_url: "http://evcc.local:7070"
+  evcc_url: "http://homeassistant.local:7070"
   vehicles:
     - "Seat"
   method: "pauschale"

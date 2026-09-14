@@ -29,7 +29,7 @@ SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 DEFAULT_TARIFF_SEED = [{"start_date": "2020-01-01", "price": 0.2614}]
 
 DEFAULT_OPTIONS = {
-    "evcc_url": "http://evcc.local:7070",
+    "evcc_url": "http://homeassistant.local:7070",
     "vehicles": ["Seat"],
     "method": "pauschale",
     "rate_ct_per_kwh": 34.0,
