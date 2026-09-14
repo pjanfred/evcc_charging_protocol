@@ -1,0 +1,34 @@
+configuration:
+  evcc_url:
+    name: evcc URL
+    description: Base URL of your evcc instance, e.g. http://homeassistant.local:7070
+  vehicles:
+    name: Vehicles (filter)
+    description: Vehicle titles (as configured in evcc, e.g. "Seat") whose charging sessions are included in the report
+  method:
+    name: Calculation method
+    description: "pauschale = flat rate per kWh, actual = your real household tariff"
+  rate_ct_per_kwh:
+    name: Flat rate (ct/kWh)
+    description: Used when method = pauschale (2026 default in Germany: 34)
+  employee:
+    name: Employee name
+    description: Default name shown in the report header
+  vehicle:
+    name: Vehicle (display text)
+    description: Text shown in the report header (e.g. "Seat, WI-XX 1234") - independent of the "Vehicles (filter)" option above
+  auto_generate:
+    name: Auto-generate monthly
+    description: Automatically create last month's report on the 2nd of each month
+  notify_on_generate:
+    name: Notify on generate
+    description: Create a Home Assistant persistent notification after each report
+  footnote_pauschale:
+    name: Footnote (flat rate method)
+    description: Custom disclaimer text shown under the table when method = pauschale. Leave empty for the default legal text.
+  footnote_actual:
+    name: Footnote (actual cost method)
+    description: Custom disclaimer text shown under the table when method = actual. Leave empty for the default legal text.
+  include_chart:
+    name: Include chart (auto-generated reports)
+    description: Whether the monthly chart is included in automatically generated reports. Off by default. Manually created reports have their own checkbox in the web UI.
