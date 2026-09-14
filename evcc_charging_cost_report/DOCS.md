@@ -28,7 +28,7 @@ with the "Delete" button. Charging sessions that run past midnight (e.g.
 For the "Actual cost" method, a **tariff history** is maintained directly on
 the add-on page (see below).
 
-All PDFs are also placed under `/share/evcc_ladekosten/`, so they're
+All PDFs are also placed under `/share/evcc_charging_cost_report/`, so they're
 reachable via the File Explorer / Samba add-on as well.
 
 The interface follows the language selected in the `language` option

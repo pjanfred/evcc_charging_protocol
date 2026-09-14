@@ -1,6 +1,6 @@
 name: "evcc Charging Cost Report"
 version: "1.0.0"
-slug: "evcc_ladekosten"
+slug: "evcc_charging_cost_report"
 description: "Generates PDF proof of evcc charging sessions (incl. meter readings) for reimbursement of company car charging costs"
 url: "https://github.com/pjanfred/evcc_charging_protocol"
 arch:

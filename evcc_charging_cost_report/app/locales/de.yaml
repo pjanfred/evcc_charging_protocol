@@ -72,7 +72,7 @@ messages:
 
 notify:
   created_title: "evcc Ladekosten-Report erstellt"
-  created_body: "{filename}: {sessions} Ladevorgänge, {kwh} kWh, {amount} EUR. Abrufbar über die Add-on-Oberfläche oder /share/evcc_ladekosten."
+  created_body: "{filename}: {sessions} Ladevorgänge, {kwh} kWh, {amount} EUR. Abrufbar über die Add-on-Oberfläche oder /share/evcc_charging_cost_report."
   error_title: "evcc Ladekosten-Report: Fehler"
   error_body: "Automatische Erstellung für {month:02d}/{year} fehlgeschlagen: {error}"
 
