@@ -29,7 +29,7 @@ SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 DEFAULT_TARIFF_SEED = [{"start_date": "2020-01-01", "price": 0.2614}]
 
 DEFAULT_OPTIONS = {
-    "evcc_url": "http://evcc.local:7070",
+    "evcc_url": "http://homeassistant.local:7070",
     "vehicles": [],
     "method": "pauschale",
     "rate_ct_per_kwh": 0.0,
@@ -39,10 +39,7 @@ DEFAULT_OPTIONS = {
     "auto_generate": True,
     "notify_on_generate": True,
     "footnote_pauschale": "",
-    "footnote_actual": (
-        "Basis of calculation: individual household tariff. The energy charged was "
-        "recorded with the MID-certified SDM630 meter (Modbus, MID V2) built into the wallbox."
-    ),
+    "footnote_actual": "Basis of calculation: individual household tariff.",
     "include_chart": False,
 }
 
@@ -265,6 +262,29 @@ def notify_home_assistant(title: str, message: str) -> None:
         log.warning("Notification to Home Assistant failed: %s", exc)
 
 
+def _resolve_report_filename(month: int, year: int) -> str:
+    """Picks the filename to write the report to.
+
+    The regular filename is reused as long as it doesn't exist yet, or
+    exists but isn't marked as submitted (in which case it's fine to
+    overwrite it, same as before). If it exists and is marked submitted, a
+    submitted report must never be overwritten - a "_X" suffix is appended
+    instead, starting at 2 and counting up until a free/non-submitted name
+    is found.
+    """
+    meta = load_meta()
+    base = f"ladekosten_{year}_{month:02d}"
+    candidate = f"{base}.pdf"
+    suffix = 2
+    while (
+        os.path.exists(os.path.join(SHARE_DIR, candidate))
+        and meta.get(candidate, {}).get("submitted")
+    ):
+        candidate = f"{base}_{suffix}.pdf"
+        suffix += 1
+    return candidate
+
+
 def generate_report(month: int, year: int, overrides: dict | None = None) -> dict:
     opts = load_options()
     if overrides:
@@ -274,7 +294,7 @@ def generate_report(month: int, year: int, overrides: dict | None = None) -> dic
     sessions = report.fetch_sessions(opts["evcc_url"], month, year, locale)
     sessions = report.filter_by_vehicle(sessions, opts.get("vehicles") or [])
 
-    filename = f"ladekosten_{year}_{month:02d}.pdf"
+    filename = _resolve_report_filename(month, year)
     out_path = os.path.join(SHARE_DIR, filename)
 
     footnote = opts.get("footnote_pauschale") if opts["method"] == "pauschale" else opts.get("footnote_actual")
@@ -407,14 +427,17 @@ def delete():
     if not full:
         error = i18n.t(locale, "messages.file_not_found", filename=filename)
     else:
-        try:
-            os.remove(full)
-            meta = load_meta()
-            meta.pop(filename, None)
-            save_meta(meta)
-            message = i18n.t(locale, "messages.report_deleted", filename=filename)
-        except OSError as exc:
-            error = i18n.t(locale, "messages.delete_failed", error=exc)
+        meta = load_meta()
+        if meta.get(filename, {}).get("submitted"):
+            error = i18n.t(locale, "messages.delete_blocked_submitted", filename=filename)
+        else:
+            try:
+                os.remove(full)
+                meta.pop(filename, None)
+                save_meta(meta)
+                message = i18n.t(locale, "messages.report_deleted", filename=filename)
+            except OSError as exc:
+                error = i18n.t(locale, "messages.delete_failed", error=exc)
     return _flash_and_redirect(message=message, error=error)
 
 

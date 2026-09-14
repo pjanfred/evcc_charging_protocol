@@ -16,7 +16,7 @@ homeassistant_api: true
 map:
   - share:rw
 options:
-  evcc_url: "http://evcc.local:7070"
+  evcc_url: "http://homeassistant.local:7070"
   vehicles: []
   method: "pauschale"
   rate_ct_per_kwh: 0.0
@@ -26,7 +26,7 @@ options:
   auto_generate: true
   notify_on_generate: true
   footnote_pauschale: ""
-  footnote_actual: "Basis of calculation: individual household tariff. The energy charged was recorded with the MID-certified SDM630 meter (Modbus, MID V2) built into the wallbox."
+  footnote_actual: "Basis of calculation: individual household tariff."
   include_chart: false
 schema:
   evcc_url: "url"

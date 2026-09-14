@@ -116,7 +116,7 @@ Beim allerersten Start legt das Add-on automatisch einen Startwert an
 Über die Weboberfläche kannst du Monat/Jahr, Methode, Mitarbeiter und Fahrzeug
 pro Report auch einmalig überschreiben, ohne die Konfiguration zu ändern.
 
-**Voreingestellte Defaults für dieses Setup:** `evcc_url: http://evcc.local:7070`,
+**Voreingestellte Defaults für dieses Setup:** `evcc_url: http://homeassistant.local:7070`,
 `vehicles: ["Seat"]` (Titel deines Fahrzeugs in der evcc-Config). Passe das an,
 falls sich deine evcc-Config ändert (z. B. bei einem zweiten Fahrzeug oder
 Fahrzeugwechsel).
