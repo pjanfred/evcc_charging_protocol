@@ -1,135 +1,138 @@
-# evcc Ladekosten-Report – Dokumentation
+# evcc Charging Cost Report – Documentation
 
-## Was macht dieses Add-on?
+[🇬🇧 English](DOCS.md) | [🇩🇪 Deutsch](DOCS.de.md)
 
-Es ruft über die REST-API deiner evcc-Instanz (`/api/sessions`) die Ladevorgänge
-eines Monats ab, filtert sie auf die von dir konfigurierten Fahrzeuge und
-erzeugt daraus ein PDF mit:
+## What does this add-on do?
 
-- Datum, Beginn-/Endzeit je Ladevorgang
-- Zählerstand Start / Ende (kWh)
-- geladener Energiemenge
-- berechnetem Erstattungsbetrag (Strompreispauschale oder tatsächlicher Tarif)
-- Plausibilitätshinweisen bei Abweichungen zwischen Zählerdifferenz und
-  gemeldeter Energie
-- Unterschriftsfeld
+It retrieves a month's charging sessions from your evcc instance's REST API
+(`/api/sessions`), filters them down to your configured vehicles, and
+generates a PDF containing:
 
-Reports können manuell über die Weboberfläche (im Home-Assistant-Sidebar unter
-"Ladekosten" via Ingress erreichbar) erzeugt werden, oder automatisch am
-2. Tag jedes Monats für den Vormonat (siehe Option `auto_generate`).
+- date, start/end time per charging session
+- meter reading start / end (kWh)
+- energy charged
+- calculated reimbursement amount (flat electricity rate or actual tariff)
+- plausibility notes for deviations between the meter difference and the
+  reported energy
+- a signature field
 
-In der Liste vorhandener Reports lässt sich jeder Report per Checkbox als
-"Eingereicht" markieren (z. B. sobald er beim Arbeitgeber abgegeben wurde)
-und über den Button "Löschen" wieder entfernen. Ladevorgänge, die über
-Mitternacht laufen (z. B. 17:28 Uhr bis 05:00 Uhr am Folgetag), werden in
-der Ende-Spalte mit "+1" gekennzeichnet (bzw. "+2", "+3", ... bei mehr als
-einem Tag Differenz).
+Reports can be generated manually via the web interface (accessible in the
+Home Assistant sidebar under "Charging Costs" via ingress), or automatically
+on the 2nd of each month for the previous month (see the `auto_generate`
+option).
 
-Für Methode "Tatsächliche Kosten" wird eine **Tarifhistorie** direkt auf der
-Add-on-Seite gepflegt (siehe unten).
+In the list of existing reports, each report can be marked "Submitted" via
+checkbox (e.g. once it has been handed in to the employer) and removed again
+with the "Delete" button. Charging sessions that run past midnight (e.g.
+5:28 PM to 5:00 AM the next day) are marked with "+1" in the End column
+(or "+2", "+3", ... for a gap of more than one day).
 
-Alle PDFs landen zusätzlich unter `/share/evcc_ladekosten/` und sind damit auch
-über den Datei-Explorer / Samba-Add-on erreichbar.
+For the "Actual cost" method, a **tariff history** is maintained directly on
+the add-on page (see below).
 
-Die Oberfläche passt sich automatisch der Hell-/Dunkel-Einstellung deines
-Browsers bzw. Betriebssystems an (`prefers-color-scheme`). Ein direkter
-Zugriff auf das in Home Assistant ausgewählte Theme ist aus einem
-Ingress-iFrame heraus technisch nicht möglich; die System-/Browser-Präferenz
-ist die bestmögliche Annäherung und deckt sich bei den meisten Setups mit
-der Home-Assistant-Einstellung.
+All PDFs are also placed under `/share/evcc_ladekosten/`, so they're
+reachable via the File Explorer / Samba add-on as well.
 
-## Hintergrund: warum Zählerstände wichtig sind
+The interface follows the language selected in the `language` option
+(English or German, see [Configuration](#configuration) below) and
+automatically adapts to your browser's/operating system's light/dark setting
+(`prefers-color-scheme`). Direct access to the theme selected in Home
+Assistant is technically not possible from within an ingress iframe; the
+system/browser preference is the best possible approximation and matches the
+Home Assistant setting in most setups.
 
-Seit dem BMF-Schreiben vom 11.11.2025 (gültig ab 01.01.2026) entfallen die alten
-Monatspauschalen für das Laden eines Dienstwagens zuhause. Eine steuerfreie
-Erstattung gibt es nur noch gegen Nachweis der tatsächlich geladenen kWh.
-Zwei Methoden sind zulässig, müssen aber pro Kalenderjahr einheitlich
-angewendet werden:
+## Background: why meter readings matter
 
-- **Strompreispauschale** (2026: 0,34 €/kWh) – ein einfacher, nicht zwingend
-  geeichter Zähler genügt.
-- **Tatsächliche Kosten** (eigener Haushaltstarif) – hierfür verlangt das BMF
-  einen eichrechtskonformen (MID-zertifizierten) Zähler.
+As of the BMF letter dated 2025-11-11 (effective 2026-01-01), the old
+monthly flat rates for charging a company car at home no longer apply. A
+tax-free reimbursement now requires proof of the actually charged kWh. Two
+methods are permitted, but must be applied consistently per calendar year:
 
-Dieses Add-on ersetzt keine steuerliche Beratung. Bitte die gewählte Methode
-mit HR/Lohnbuchhaltung abstimmen.
+- **Flat electricity rate** (2026: €0.34/kWh) – a simple meter, not
+  necessarily calibrated, is sufficient.
+- **Actual cost** (your own household tariff) – for this, the BMF requires a
+  calibration-law-compliant (MID-certified) meter.
 
-## Tarifhistorie (Methode "Tatsächliche Kosten")
+This add-on does not replace tax advice. Please align the chosen method with
+HR/payroll.
 
-Auf der Add-on-Seite gibt es eine Karte "Tarifhistorie", in der du beliebig
-viele Zeiträume mit Startdatum und Preis (€/kWh) hinterlegen kannst. Für
-jeden Ladevorgang wird automatisch der Satz verwendet, dessen Startdatum am
-nächsten am (aber nicht nach dem) Ladedatum liegt – ein Tarifwechsel mitten
-im Monat wirkt sich also korrekt nur auf die Ladevorgänge danach aus.
+## Tariff history (method "Actual cost")
 
-Beispiel: Eintrag "01.01.2020 → 0,2614 €/kWh" und "15.08.2026 → 0,31 €/kWh"
-sorgt dafür, dass alle Ladevorgänge bis zum 14.08.2026 mit 0,2614 €/kWh und
-ab dem 15.08.2026 mit 0,31 €/kWh berechnet werden.
+The add-on page has a "Tariff history" card where you can store any number
+of periods with a start date and price (€/kWh). For each charging session,
+the entry whose start date is closest to (but not after) the charging date
+is automatically applied – a tariff change in the middle of the month
+therefore correctly affects only the charging sessions after it.
 
-Der jeweils angewandte Satz wird zur Nachvollziehbarkeit als eigene Spalte
-"Satz (€/kWh)" in der PDF-Tabelle ausgewiesen. Liegt ein Ladevorgang vor dem
-ältesten hinterlegten Zeitraum, wird ersatzweise dieser älteste Satz
-verwendet und im PDF als Plausibilitätshinweis vermerkt, statt die
-Report-Erstellung abzubrechen.
+Example: entries "2020-01-01 → €0.2614/kWh" and "2026-08-15 → €0.31/kWh"
+mean that all charging sessions up to 2026-08-14 are calculated at
+€0.2614/kWh, and from 2026-08-15 onward at €0.31/kWh.
 
-Wurden im Report-Zeitraum mehrere Tarife angewandt, druckt das PDF zusätzlich
-eine kleine Tabelle "Im Zeitraum verwendete Tarife" mit genau den relevanten
-Einträgen (Startdatum + Preis) mit ab – nicht die komplette Tarifhistorie,
-sondern nur das, was für diesen Report tatsächlich zum Einsatz kam. Das gilt
-auch dann korrekt, wenn ein älterer und ein neuerer Tarifeintrag zufällig
-denselben Preis haben (z. B. unveränderter Preis bei einem Anbieterwechsel):
-Es wird der tatsächlich herangezogene Eintrag angezeigt, nicht jeder Eintrag
-mit passendem Preis.
+The rate actually applied is shown for traceability as its own "Rate
+(€/kWh)" column in the PDF table. If a charging session predates the oldest
+stored period, that oldest rate is used as a fallback and noted in the PDF
+as a plausibility note, instead of aborting report creation.
 
-**Belege als Anlage:** Pro Tarifzeitraum kann optional ein PDF-Beleg
-hochgeladen werden (z. B. Stromvertrag oder Preisanpassungsschreiben). Sobald
-ein Zeitraum mit Beleg für einen Report relevant ist, wird der Beleg
-automatisch als Anlage an das erzeugte PDF angehängt – unabhängig davon, ob
-im Zeitraum ein Tarifwechsel stattfand oder nur ein einziger Tarif galt, und
-auch bei mehreren gleichzeitig relevanten Belegen (je einer pro Zeitraum,
-mit eigener Trennseite). Ein defekter oder kein gültiges PDF wird nicht
-angehängt, sondern als Plausibilitätshinweis im Report vermerkt.
+If multiple tariffs were applied within the report period, the PDF
+additionally prints a small "Tariffs used in this period" table with exactly
+the relevant entries (start date + price) – not the entire tariff history,
+just what was actually used for this report. This works correctly even when
+an older and a newer tariff entry happen to share the same price (e.g. an
+unchanged price after switching providers): the entry actually applied is
+shown, not every entry with a matching price.
 
-Beim allerersten Start legt das Add-on automatisch einen Startwert an
-(01.01.2020, 0,2614 €/kWh), damit nichts abbricht, solange du noch keine eigenen Einträge gepflegt hast.
+**Receipts as attachments:** an optional PDF receipt can be uploaded per
+tariff period (e.g. an energy contract or price adjustment letter). Once a
+period with a receipt is relevant to a report, the receipt is automatically
+attached to the generated PDF – regardless of whether a tariff change
+occurred within the period or only a single tariff applied, and even with
+several simultaneously relevant receipts (one per period, each with its own
+divider page). A corrupted or invalid PDF is not attached, but noted as a
+plausibility note in the report instead.
 
-## Konfiguration
+On the very first start, the add-on automatically creates a seed value
+(2020-01-01, €0.2614/kWh) so nothing breaks before you've maintained your
+own entries.
 
-| Option | Beschreibung |
+## Configuration
+
+| Option | Description |
 |---|---|
-| `evcc_url` | Basis-URL deiner evcc-Instanz, z. B. `http://homeassistant.local:7070` |
-| `vehicles` | Liste der Fahrzeug-Titel (wie in evcc unter `vehicles -> title` benannt), deren Ladevorgänge in den Report aufgenommen werden |
-| `method` | `pauschale` oder `actual` |
-| `rate_ct_per_kwh` | Cent/kWh bei `method: pauschale` |
-| `employee` | Standardname für den Report-Header |
-| `vehicle` | Anzeigetext im Report-Header (z. B. "Seat, WI-XX 1234") – unabhängig vom Filter `vehicles` oben |
-| `auto_generate` | Automatische Erstellung am 2. jeden Monats für den Vormonat |
-| `notify_on_generate` | Persistent Notification in Home Assistant nach Erstellung |
-| `footnote_pauschale` | Eigener Hinweistext unter der Tabelle bei Methode `pauschale`. Leer lassen für den Standardtext (BMF-Verweis). |
-| `footnote_actual` | Eigener Hinweistext unter der Tabelle bei Methode `actual`. Leer lassen für den Standardtext (BMF-Verweis). |
-| `include_chart` | Ob das Verlaufsdiagramm bei automatisch erstellten Reports mit ausgegeben wird. Standard: nein. Bei manueller Erstellung über die Weboberfläche gibt es dafür eine eigene Checkbox (ebenfalls standardmäßig deaktiviert). |
+| `evcc_url` | Base URL of your evcc instance, e.g. `http://homeassistant.local:7070` |
+| `vehicles` | List of vehicle titles (as named in evcc under `vehicles -> title`) whose charging sessions are included in the report |
+| `method` | `pauschale` (flat rate) or `actual` |
+| `rate_ct_per_kwh` | Cents/kWh for `method: pauschale` |
+| `employee` | Default name for the report header |
+| `vehicle` | Display text in the report header (e.g. "Seat, WI-XX 1234") – independent of the `vehicles` filter above |
+| `language` | UI and PDF language: `en` (English, default) or `de` (German) |
+| `auto_generate` | Automatic creation on the 2nd of each month for the previous month |
+| `notify_on_generate` | Persistent notification in Home Assistant after each report |
+| `footnote_pauschale` | Custom disclaimer text below the table for method `pauschale`. Leave empty for the default text (BMF reference). |
+| `footnote_actual` | Custom disclaimer text below the table for method `actual`. Leave empty for the default text (BMF reference). |
+| `include_chart` | Whether the trend chart is included in automatically generated reports. Default: off. Manually created reports have their own checkbox in the web interface (also off by default). |
 
-Über die Weboberfläche kannst du Monat/Jahr, Methode, Mitarbeiter und Fahrzeug
-pro Report auch einmalig überschreiben, ohne die Konfiguration zu ändern.
+Via the web interface you can also override month/year, method, employee and
+vehicle for a single report without changing the configuration.
 
-**Voreingestellte Defaults für dieses Setup:** `evcc_url: http://evcc.local:7070`,
-`vehicles: ["Seat"]` (Titel deines Fahrzeugs in der evcc-Config). Passe das an,
-falls sich deine evcc-Config ändert (z. B. bei einem zweiten Fahrzeug oder
-Fahrzeugwechsel).
+**Preconfigured defaults for this setup:** `evcc_url: http://evcc.local:7070`,
+`vehicles: ["Seat"]` (the title of your vehicle in the evcc config). Adjust
+this if your evcc config changes (e.g. a second vehicle or a vehicle
+change).
 
-Warum Fahrzeug statt Ladepunkt? So werden auch Ladevorgänge desselben Fahrzeugs
-an unterschiedlichen (Home-)Ladepunkten korrekt erfasst, und andere Fahrzeuge,
-die zufällig am selben Ladepunkt laden, bleiben zuverlässig außen vor.
+Why vehicle instead of charge point? This way, charging sessions of the same
+vehicle at different (home) charge points are also correctly captured, and
+other vehicles that happen to charge at the same charge point are reliably
+excluded.
 
-## Bekannte Einschränkungen
+## Known limitations
 
-- Die evcc-API muss vom Add-on aus per HTTP erreichbar sein (gleiches
-  Heimnetz bzw. gleicher Host).
-- Für die Methode `actual` liegt die Verantwortung für einen
-  eichrechtskonformen Zähler und die korrekte Tarifpflege beim Nutzer.
-- Die Tarifhistorie liegt in `/data/tariffs.json` im persistenten
-  Add-on-Datenspeicher (nicht in `/share`) und übersteht Neustarts sowie
-  Updates, ist aber nicht direkt über den Datei-Explorer sichtbar –
-  Pflege ausschließlich über die Weboberfläche.
-- Hochgeladene Tarifbelege liegen entsprechend in `/data/tariff_docs/`,
-  ebenfalls persistent und nicht über `/share` sichtbar.
+- The evcc API must be reachable from the add-on via HTTP (same home
+  network or same host).
+- For method `actual`, responsibility for a calibration-law-compliant meter
+  and correct tariff maintenance lies with the user.
+- The tariff history is stored in `/data/tariffs.json` in the add-on's
+  persistent data storage (not in `/share`) and survives restarts and
+  updates, but is not directly visible via the File Explorer – it is
+  maintained exclusively via the web interface.
+- Uploaded tariff receipts are correspondingly stored in
+  `/data/tariff_docs/`, likewise persistent and not visible via `/share`.

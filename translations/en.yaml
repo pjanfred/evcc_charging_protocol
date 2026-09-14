@@ -17,6 +17,9 @@ configuration:
   vehicle:
     name: Vehicle (display text)
     description: Text shown in the report header (e.g. "Seat, WI-XX 1234") - independent of the "Vehicles (filter)" option above
+  language:
+    name: Language
+    description: Language used for the web interface and the generated PDF reports (en = English, de = German)
   auto_generate:
     name: Auto-generate monthly
     description: Automatically create last month's report on the 2nd of each month

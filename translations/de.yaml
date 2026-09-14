@@ -1,0 +1,37 @@
+configuration:
+  evcc_url:
+    name: evcc-URL
+    description: Basis-URL deiner evcc-Instanz, z. B. http://homeassistant.local:7070
+  vehicles:
+    name: Fahrzeuge (Filter)
+    description: Fahrzeugtitel (wie in evcc konfiguriert, z. B. "Seat"), deren Ladevorgänge in den Report aufgenommen werden
+  method:
+    name: Berechnungsmethode
+    description: "pauschale = Pauschalbetrag pro kWh, actual = dein tatsächlicher Haushaltstarif"
+  rate_ct_per_kwh:
+    name: Pauschale (ct/kWh)
+    description: Wird verwendet, wenn method = pauschale (Standard 2026 in Deutschland: 34)
+  employee:
+    name: Name Mitarbeiter/in
+    description: Standardname im Report-Header
+  vehicle:
+    name: Fahrzeug (Anzeigetext)
+    description: Text im Report-Header (z. B. "Seat, WI-XX 1234") - unabhängig von der Option "Fahrzeuge (Filter)" oben
+  language:
+    name: Sprache
+    description: Sprache der Weboberfläche und der erzeugten PDF-Reports (en = Englisch, de = Deutsch)
+  auto_generate:
+    name: Automatisch monatlich erstellen
+    description: Erstellt den Report für den Vormonat automatisch am 2. jeden Monats
+  notify_on_generate:
+    name: Benachrichtigung bei Erstellung
+    description: Erzeugt nach jedem Report eine Home-Assistant-Benachrichtigung
+  footnote_pauschale:
+    name: Fußnote (Methode Pauschale)
+    description: Eigener Hinweistext unter der Tabelle bei Methode = pauschale. Leer lassen für den Standardtext.
+  footnote_actual:
+    name: Fußnote (Methode Tatsächliche Kosten)
+    description: Eigener Hinweistext unter der Tabelle bei Methode = actual. Leer lassen für den Standardtext.
+  include_chart:
+    name: Diagramm einbeziehen (automatisch erstellte Reports)
+    description: Ob das Verlaufsdiagramm bei automatisch erstellten Reports mit ausgegeben wird. Standardmäßig aus. Manuell erstellte Reports haben eine eigene Checkbox in der Weboberfläche.
