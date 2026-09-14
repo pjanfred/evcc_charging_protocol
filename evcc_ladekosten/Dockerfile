@@ -5,8 +5,8 @@ LABEL \
     org.opencontainers.image.description="A Home Assistant add-on that retrieves charging records for an evcc instance via its REST API and uses them to generate a PDF receipt for claiming reimbursement of company car charging costs from the employer." \
     org.opencontainers.image.licenses="MIT"
 
-# Python + pip + DejaVu Sans (für ein hochwertigeres PDF-Schriftbild)
-# auf dem Alpine-basierten HA-Base-Image
+# Python + pip + DejaVu Sans (for higher-quality PDF typography)
+# on the Alpine-based HA base image
 RUN apk add --no-cache python3 py3-pip font-dejavu
 
 WORKDIR /app

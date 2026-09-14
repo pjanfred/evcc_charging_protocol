@@ -1,5 +1,7 @@
 # evcc Ladekosten-Report – Dokumentation
 
+[🇬🇧 English](DOCS.md) | [🇩🇪 Deutsch](DOCS.de.md)
+
 ## Was macht dieses Add-on?
 
 Es ruft über die REST-API deiner evcc-Instanz (`/api/sessions`) die Ladevorgänge
@@ -15,7 +17,7 @@ erzeugt daraus ein PDF mit:
 - Unterschriftsfeld
 
 Reports können manuell über die Weboberfläche (im Home-Assistant-Sidebar unter
-"Ladekosten" via Ingress erreichbar) erzeugt werden, oder automatisch am
+"Charging Costs" via Ingress erreichbar) erzeugt werden, oder automatisch am
 2. Tag jedes Monats für den Vormonat (siehe Option `auto_generate`).
 
 In der Liste vorhandener Reports lässt sich jeder Report per Checkbox als
@@ -31,12 +33,13 @@ Add-on-Seite gepflegt (siehe unten).
 Alle PDFs landen zusätzlich unter `/share/evcc_ladekosten/` und sind damit auch
 über den Datei-Explorer / Samba-Add-on erreichbar.
 
-Die Oberfläche passt sich automatisch der Hell-/Dunkel-Einstellung deines
-Browsers bzw. Betriebssystems an (`prefers-color-scheme`). Ein direkter
-Zugriff auf das in Home Assistant ausgewählte Theme ist aus einem
-Ingress-iFrame heraus technisch nicht möglich; die System-/Browser-Präferenz
-ist die bestmögliche Annäherung und deckt sich bei den meisten Setups mit
-der Home-Assistant-Einstellung.
+Die Oberfläche folgt der in der Option `language` gewählten Sprache (Englisch
+oder Deutsch, siehe [Konfiguration](#konfiguration) unten) und passt sich
+automatisch der Hell-/Dunkel-Einstellung deines Browsers bzw. Betriebssystems
+an (`prefers-color-scheme`). Ein direkter Zugriff auf das in Home Assistant
+ausgewählte Theme ist aus einem Ingress-iFrame heraus technisch nicht
+möglich; die System-/Browser-Präferenz ist die bestmögliche Annäherung und
+deckt sich bei den meisten Setups mit der Home-Assistant-Einstellung.
 
 ## Hintergrund: warum Zählerstände wichtig sind
 
@@ -103,6 +106,7 @@ Beim allerersten Start legt das Add-on automatisch einen Startwert an
 | `rate_ct_per_kwh` | Cent/kWh bei `method: pauschale` |
 | `employee` | Standardname für den Report-Header |
 | `vehicle` | Anzeigetext im Report-Header (z. B. "Seat, WI-XX 1234") – unabhängig vom Filter `vehicles` oben |
+| `language` | Sprache der Oberfläche und der PDFs: `en` (Englisch, Standard) oder `de` (Deutsch) |
 | `auto_generate` | Automatische Erstellung am 2. jeden Monats für den Vormonat |
 | `notify_on_generate` | Persistent Notification in Home Assistant nach Erstellung |
 | `footnote_pauschale` | Eigener Hinweistext unter der Tabelle bei Methode `pauschale`. Leer lassen für den Standardtext (BMF-Verweis). |

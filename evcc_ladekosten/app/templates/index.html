@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ locale }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>evcc Ladekosten-Report</title>
+  <title>{{ t.app.title }}</title>
   <style>
     :root {
       --navy: #111827;
@@ -33,11 +33,11 @@
       --radius: 12px;
     }
 
-    /* Die Add-on-Oberfläche läuft in einem Ingress-iFrame und hat daher
-       keinen Zugriff auf das aktuell gewählte Home-Assistant-Theme (das
-       ist eine Browser-Einschränkung, keine Home-Assistant-Einstellung).
-       Als bestmögliche Annäherung folgt sie stattdessen der System-/
-       Browser-Präferenz für helles oder dunkles Farbschema. */
+    /* The add-on interface runs inside an ingress iframe and therefore has
+       no access to the currently selected Home Assistant theme (this is a
+       browser limitation, not a Home Assistant setting). As the best
+       possible approximation it instead follows the system/browser
+       preference for a light or dark color scheme. */
     @media (prefers-color-scheme: dark) {
       :root {
         --navy-soft: #e5e7eb;
@@ -289,9 +289,9 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M13 2L4 14H11L10 22L20 9H13L14 2Z"/>
       </svg>
-      Ladekosten-Report
+      {{ t.app.title }}
     </h1>
-    <div class="sub">Nachweis der evcc-Ladevorgänge (inkl. Zählerständen) für die Erstattung durch den Arbeitgeber</div>
+    <div class="sub">{{ t.app.subtitle }}</div>
   </div>
 
   <div class="wrap">
@@ -299,11 +299,11 @@
     {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
 
     <div class="card">
-      <h2>Neuen Report erstellen</h2>
+      <h2>{{ t.form.new_report.title }}</h2>
       <form method="post" action="generate">
         <div class="row">
           <div>
-            <label for="month">Monat</label>
+            <label for="month">{{ t.form.new_report.month }}</label>
             <select id="month" name="month">
               {% for m in range(1, 13) %}
               <option value="{{ m }}" {% if m == default_month %}selected{% endif %}>{{ "%02d"|format(m) }}</option>
@@ -311,72 +311,68 @@
             </select>
           </div>
           <div>
-            <label for="year">Jahr</label>
+            <label for="year">{{ t.form.new_report.year }}</label>
             <input type="number" id="year" name="year" value="{{ default_year }}">
           </div>
           <div>
-            <label for="method">Methode</label>
+            <label for="method">{{ t.form.new_report.method }}</label>
             <select id="method" name="method">
-              <option value="pauschale" {% if opts.method == "pauschale" %}selected{% endif %}>Strompreispauschale</option>
-              <option value="actual" {% if opts.method == "actual" %}selected{% endif %}>Tatsächliche Kosten</option>
+              <option value="pauschale" {% if opts.method == "pauschale" %}selected{% endif %}>{{ t.form.new_report.method_flat }}</option>
+              <option value="actual" {% if opts.method == "actual" %}selected{% endif %}>{{ t.form.new_report.method_actual }}</option>
             </select>
           </div>
         </div>
         <div class="row">
           <div>
-            <label for="employee">Mitarbeiter/in</label>
-            <input type="text" id="employee" name="employee" value="{{ opts.employee }}" placeholder="Name für den Report-Header">
+            <label for="employee">{{ t.form.new_report.employee }}</label>
+            <input type="text" id="employee" name="employee" value="{{ opts.employee }}" placeholder="{{ t.form.new_report.employee_placeholder }}">
           </div>
           <div>
-            <label for="vehicle">Fahrzeug</label>
-            <input type="text" id="vehicle" name="vehicle" value="{{ opts.vehicle }}" placeholder="z. B. Seat, WI-XX 1234">
+            <label for="vehicle">{{ t.form.new_report.vehicle }}</label>
+            <input type="text" id="vehicle" name="vehicle" value="{{ opts.vehicle }}" placeholder="{{ t.form.new_report.vehicle_placeholder }}">
           </div>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="include_chart" name="include_chart">
-          <label for="include_chart" class="checkbox-label">Verlaufsdiagramm im PDF mit ausgeben</label>
+          <label for="include_chart" class="checkbox-label">{{ t.form.new_report.include_chart }}</label>
         </div>
         <div class="field-hint">
-          evcc-Instanz: <code>{{ opts.evcc_url }}</code> · Fahrzeugfilter: <code>{{ opts.vehicles|join(", ") }}</code><br>
-          Änderungen daran bitte über die Add-on-Konfiguration vornehmen.
+          {{ t.form.new_report.hint.format(url=opts.evcc_url, vehicles=opts.vehicles|join(", "))|safe }}
         </div>
-        <button type="submit" class="primary">PDF-Report erstellen</button>
+        <button type="submit" class="primary">{{ t.form.new_report.submit }}</button>
       </form>
     </div>
 
     <div class="card">
-      <h2>Tarifhistorie (für "Tatsächliche Kosten")</h2>
+      <h2>{{ t.form.tariffs.title }}</h2>
       <div class="field-hint">
-        Hier hinterlegte Zeiträume gelten ab dem jeweiligen Startdatum, bis der nächste Eintrag greift.
-        So werden auch Tarifwechsel mitten im Monat korrekt pro Ladevorgang berücksichtigt. Optional kann
-        pro Zeitraum ein Beleg (PDF, z. B. Stromvertrag oder Preisanpassungsschreiben) hochgeladen werden –
-        dieser wird jedem betroffenen Report automatisch als Anlage angehängt.
+        {{ t.form.tariffs.hint }}
       </div>
       {% if tariffs %}
       <table>
         <thead>
-          <tr><th>Gültig ab</th><th>Preis (€/kWh)</th><th>Beleg</th><th></th></tr>
+          <tr><th>{{ t.form.tariffs.valid_from }}</th><th>{{ t.form.tariffs.price }}</th><th>{{ t.form.tariffs.document }}</th><th></th></tr>
         </thead>
         <tbody>
-          {% for t in tariffs %}
+          {% for tf in tariffs %}
           <tr>
-            <td>{{ t.start_date_display }}</td>
-            <td>{{ t.price_display }}</td>
+            <td>{{ tf.start_date_display }}</td>
+            <td>{{ tf.price_display }}</td>
             <td>
-              {% if t.has_document %}
-              <a class="dl" href="tariffs/doc/{{ t.start_date_iso }}" target="_blank">{{ t.document_name }}</a>
-              <form class="inline-form" method="post" action="tariffs/delete_doc" onsubmit="return confirm('Beleg für Tarif ab {{ t.start_date_display }} wirklich entfernen?');">
-                <input type="hidden" name="start_date" value="{{ t.start_date_iso }}">
-                <button type="submit" class="del-btn">Entfernen</button>
+              {% if tf.has_document %}
+              <a class="dl" href="tariffs/doc/{{ tf.start_date_iso }}" target="_blank">{{ tf.document_name }}</a>
+              <form class="inline-form" method="post" action="tariffs/delete_doc" onsubmit="return confirm('{{ t.form.tariffs.confirm_delete_doc.format(date=tf.start_date_display) }}');">
+                <input type="hidden" name="start_date" value="{{ tf.start_date_iso }}">
+                <button type="submit" class="del-btn">{{ t.form.tariffs.remove }}</button>
               </form>
               {% else %}
-              <span class="hint-text">– kein Beleg –</span>
+              <span class="hint-text">{{ t.form.tariffs.no_document }}</span>
               {% endif %}
             </td>
             <td>
-              <form class="inline-form" method="post" action="tariffs/delete" onsubmit="return confirm('Tarifeintrag ab {{ t.start_date_display }} wirklich löschen?');">
-                <input type="hidden" name="start_date" value="{{ t.start_date_iso }}">
-                <button type="submit" class="del-btn">Löschen</button>
+              <form class="inline-form" method="post" action="tariffs/delete" onsubmit="return confirm('{{ t.form.tariffs.confirm_delete.format(date=tf.start_date_display) }}');">
+                <input type="hidden" name="start_date" value="{{ tf.start_date_iso }}">
+                <button type="submit" class="del-btn">{{ t.form.tariffs.delete }}</button>
               </form>
             </td>
           </tr>
@@ -384,35 +380,35 @@
         </tbody>
       </table>
       {% else %}
-      <div class="empty-state">Noch keine Tarifzeiträume hinterlegt.</div>
+      <div class="empty-state">{{ t.form.tariffs.empty }}</div>
       {% endif %}
 
       <form method="post" action="tariffs/add" enctype="multipart/form-data" class="row" style="margin-top: 14px; align-items: flex-end;">
         <div>
-          <label for="tariff_start_date">Gültig ab</label>
+          <label for="tariff_start_date">{{ t.form.tariffs.valid_from }}</label>
           <input type="date" id="tariff_start_date" name="start_date" required>
         </div>
         <div>
-          <label for="tariff_price">Preis (€/kWh)</label>
-          <input type="text" id="tariff_price" name="price" placeholder="z. B. 0,2614" required>
+          <label for="tariff_price">{{ t.form.tariffs.price }}</label>
+          <input type="text" id="tariff_price" name="price" placeholder="{{ t.form.tariffs.price_placeholder }}" required>
         </div>
         <div>
-          <label for="tariff_document">Beleg (PDF, optional)</label>
+          <label for="tariff_document">{{ t.form.tariffs.document_optional }}</label>
           <input type="file" id="tariff_document" name="document" accept="application/pdf">
         </div>
         <div style="flex: 0 0 auto;">
-          <button type="submit" class="primary">Hinzufügen</button>
+          <button type="submit" class="primary">{{ t.form.tariffs.add }}</button>
         </div>
       </form>
     </div>
 
     <div class="card">
-      <h2>Vorhandene Reports</h2>
+      <h2>{{ t.form.reports.title }}</h2>
       {% if reports %}
       <table>
         <thead>
           <tr>
-            <th>Datei</th><th>Erstellt</th><th>Größe</th><th></th><th class="center">Eingereicht</th><th></th>
+            <th>{{ t.form.reports.file }}</th><th>{{ t.form.reports.created }}</th><th>{{ t.form.reports.size }}</th><th></th><th class="center">{{ t.form.reports.submitted }}</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -421,7 +417,7 @@
             <td>{{ r.name }}</td>
             <td>{{ r.modified }}</td>
             <td>{{ r.size_kb }} KB</td>
-            <td><a class="dl" href="download/{{ r.name }}">Download</a></td>
+            <td><a class="dl" href="download/{{ r.name }}">{{ t.form.reports.download }}</a></td>
             <td class="center">
               <form class="inline-form" method="post" action="toggle_submitted">
                 <input type="hidden" name="filename" value="{{ r.name }}">
@@ -429,9 +425,9 @@
               </form>
             </td>
             <td>
-              <form class="inline-form" method="post" action="delete" onsubmit="return confirm('Report {{ r.name }} wirklich löschen?');">
+              <form class="inline-form" method="post" action="delete" onsubmit="return confirm('{{ t.form.reports.confirm_delete.format(name=r.name) }}');">
                 <input type="hidden" name="filename" value="{{ r.name }}">
-                <button type="submit" class="del-btn">Löschen</button>
+                <button type="submit" class="del-btn">{{ t.form.reports.delete }}</button>
               </form>
             </td>
           </tr>
@@ -439,11 +435,11 @@
         </tbody>
       </table>
       {% else %}
-      <div class="empty-state">Noch keine Reports erstellt.</div>
+      <div class="empty-state">{{ t.form.reports.empty }}</div>
       {% endif %}
     </div>
 
-    <div class="footer-note">evcc Ladekosten-Report · Home Assistant Add-on</div>
+    <div class="footer-note">{{ t.app.footer }}</div>
   </div>
 </body>
 </html>

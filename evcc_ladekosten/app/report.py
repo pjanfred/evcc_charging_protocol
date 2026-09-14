@@ -1,8 +1,8 @@
 """
-Kernlogik für den evcc Ladekosten-Report.
+Core logic for the evcc charging cost report.
 
-Enthaelt keine Add-on-spezifische Logik (kein Flask, kein /data/options.json) -
-so bleibt das Modul auch ausserhalb des Containers testbar.
+Contains no add-on-specific logic (no Flask, no /data/options.json) so the
+module stays testable outside the container too.
 """
 
 import os
@@ -31,10 +31,12 @@ from reportlab.platypus import (
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics.charts.barcharts import VerticalBarChart
 
+import i18n
+
 PLAUSIBILITY_TOLERANCE_KWH = 0.3
 
 # ---------------------------------------------------------------------------
-# Design-System: Farben, Typografie, Maße
+# Design system: colors, typography, measurements
 # ---------------------------------------------------------------------------
 
 NAVY = colors.HexColor("#111827")
@@ -55,9 +57,9 @@ FOOTER_HEIGHT = 14 * mm
 
 
 def _register_fonts() -> tuple[str, str]:
-    """Registriert DejaVu Sans für ein moderneres Schriftbild, falls verfügbar.
-    Fällt sauber auf die eingebauten Helvetica-Fonts zurück (z. B. wenn das
-    Paket ttf-dejavu im Container nicht installiert ist)."""
+    """Registers DejaVu Sans for a more modern look, if available.
+    Falls back cleanly to the built-in Helvetica fonts (e.g. when the
+    ttf-dejavu package isn't installed in the container)."""
     candidates = [
         ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
@@ -149,42 +151,43 @@ def _styles():
 
 
 # ---------------------------------------------------------------------------
-# evcc-Datenzugriff
+# evcc data access
 # ---------------------------------------------------------------------------
 
-def fetch_sessions(evcc_url: str, month: int, year: int) -> list[dict]:
+def fetch_sessions(evcc_url: str, month: int, year: int, locale: str = "en") -> list[dict]:
     url = f"{evcc_url.rstrip('/')}/api/sessions"
-    params = {"format": "json", "month": month, "year": year, "lang": "de"}
+    params = {"format": "json", "month": month, "year": year, "lang": locale}
     resp = requests.get(url, params=params, timeout=10)
     resp.raise_for_status()
     payload = resp.json()
     sessions = payload.get("result", payload) if isinstance(payload, dict) else payload
     if not isinstance(sessions, list):
-        raise ValueError("Unerwartetes Antwortformat der evcc-API (keine Liste von Sessions).")
+        raise ValueError("Unexpected evcc API response format (not a list of sessions).")
     return sessions
 
 
 def filter_by_vehicle(sessions: list[dict], vehicles: list[str]) -> list[dict]:
-    """Filtert Sessions auf die konfigurierten Fahrzeuge (evcc-Feld 'vehicle').
+    """Filters sessions down to the configured vehicles (evcc field 'vehicle').
 
-    Relevant ist das Fahrzeug, nicht der Ladepunkt: so werden auch
-    Ladevorgänge desselben Fahrzeugs an unterschiedlichen (Home-)Ladepunkten
-    korrekt erfasst, und andere Fahrzeuge am selben Ladepunkt bleiben außen vor.
+    What matters is the vehicle, not the charge point: this way charging
+    sessions of the same vehicle at different (home) charge points are
+    correctly included, while other vehicles at the same charge point are
+    reliably excluded.
     """
     if not vehicles:
         return sessions
     return [s for s in sessions if s.get("vehicle") in vehicles]
 
 
-def check_plausibility(session: dict) -> str | None:
+def check_plausibility(session: dict, locale: str = "en") -> str | None:
     start = session.get("meterStart")
     stop = session.get("meterStop")
     energy = session.get("chargedEnergy")
     if start is None or stop is None or energy is None:
-        return "Zählerstand fehlt"
+        return i18n.t(locale, "report.meter_missing")
     diff = round(stop - start, 2)
     if abs(diff - energy) > PLAUSIBILITY_TOLERANCE_KWH:
-        return f"Abweichung Zähler ({diff} kWh) vs. Energie ({energy} kWh)"
+        return i18n.t(locale, "report.meter_deviation", diff=diff, energy=energy)
     return None
 
 
@@ -192,24 +195,25 @@ def compute_amount(energy_kwh: float, rate_eur_per_kwh: float) -> float:
     return round(energy_kwh * rate_eur_per_kwh, 2)
 
 
-def resolve_tariff(session_date, tariff_periods: list[dict]) -> tuple[float, dict | None, str | None]:
-    """Ermittelt den zum Ladedatum gültigen Tarif aus der Tarifhistorie.
+def resolve_tariff(
+    session_date, tariff_periods: list[dict], locale: str = "en"
+) -> tuple[float, dict | None, str | None]:
+    """Determines the tariff in effect for a charging date from the tariff history.
 
-    ``tariff_periods``: Liste von {"start_date": date, "price": float}, beliebige
-    Reihenfolge. Es gilt der Eintrag mit dem jüngsten Startdatum <= session_date.
-    Liegt session_date vor dem frühesten Eintrag, wird dieser als Fallback
-    genutzt und eine Warnung zurückgegeben (statt die Erstellung abzubrechen).
-    Ohne jegliche Einträge wird 0.0 mit Warnung zurückgegeben.
+    ``tariff_periods``: list of {"start_date": date, "price": float}, any
+    order. The entry with the most recent start date <= session_date applies.
+    If session_date is before the earliest entry, that entry is used as a
+    fallback and a warning is returned (instead of aborting report creation).
+    With no entries at all, 0.0 is returned with a warning.
 
-    Gibt (Preis, verwendete Periode, Warnung) zurück. Die zurückgegebene
-    Periode ist wichtig, um später genau die tatsächlich herangezogenen
-    Zeiträume zu identifizieren - rein über den Preis zu matchen würde bei
-    zwei Perioden mit zufällig demselben Preis (z. B. unveränderter Tarif,
-    aber neuer Vertrag/Beleg zum Jahreswechsel) fälschlich beide als
-    "verwendet" markieren.
+    Returns (price, period used, warning). The returned period matters for
+    later identifying exactly which periods were actually used - matching by
+    price alone would incorrectly flag both periods as "used" when two
+    periods happen to share the same price (e.g. an unchanged tariff but a
+    new contract/receipt at the turn of the year).
     """
     if not tariff_periods:
-        return 0.0, None, "Kein Tarif in der Tarifhistorie hinterlegt"
+        return 0.0, None, i18n.t(locale, "report.no_tariff_history")
 
     sorted_periods = sorted(tariff_periods, key=lambda p: p["start_date"])
     applicable = None
@@ -221,11 +225,12 @@ def resolve_tariff(session_date, tariff_periods: list[dict]) -> tuple[float, dic
 
     if applicable is None:
         earliest = sorted_periods[0]
-        price_label = f"{earliest['price']:.4f}".replace(".", ",")
-        return earliest["price"], earliest, (
-            f"Kein Tarif vor {earliest['start_date'].strftime('%d.%m.%Y')} hinterlegt – "
-            f"{price_label} €/kWh angenommen"
+        price_label = i18n.fmt_number(earliest["price"], 4, locale)
+        warning = i18n.t(
+            locale, "report.no_tariff_before",
+            date=i18n.fmt_date(earliest["start_date"], locale), price=price_label,
         )
+        return earliest["price"], earliest, warning
     return applicable["price"], applicable, None
 
 
@@ -234,13 +239,11 @@ def parse_iso(ts: str) -> datetime:
 
 
 # ---------------------------------------------------------------------------
-# PDF-Aufbau
+# PDF assembly
 # ---------------------------------------------------------------------------
 
-MONTH_NAMES_DE = [
-    "", "Januar", "Februar", "März", "April", "Mai", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "Dezember",
-]
+def _month_name(month: int, locale: str) -> str:
+    return i18n.strings(locale)["report"]["months"][month]
 
 
 def _kpi_card(value: str, label: str, styles: dict, accent: bool = False) -> Table:
@@ -261,12 +264,15 @@ def _kpi_card(value: str, label: str, styles: dict, accent: bool = False) -> Tab
     return t
 
 
-def _build_attachment_cover(period: dict, period_label: str, original_filename: str | None) -> bytes:
-    """Erzeugt eine einzelne Trennseite vor einem angehängten Tarifnachweis-PDF."""
+def _build_attachment_cover(
+    period: dict, period_label: str, original_filename: str | None, locale: str = "en"
+) -> bytes:
+    """Renders a single divider page placed before an attached tariff receipt PDF."""
     buf = BytesIO()
     styles = _styles()
     cnv = pdfcanvas.Canvas(buf, pagesize=A4)
     page_w, page_h = A4
+    r = i18n.strings(locale)["report"]
 
     cnv.setFillColor(NAVY)
     cnv.rect(0, page_h - HEADER_HEIGHT, page_w, HEADER_HEIGHT, stroke=0, fill=1)
@@ -274,60 +280,64 @@ def _build_attachment_cover(period: dict, period_label: str, original_filename: 
     cnv.rect(0, page_h - HEADER_HEIGHT - 1.2 * mm, page_w, 1.2 * mm, stroke=0, fill=1)
     cnv.setFont(FONT_BOLD, 16)
     cnv.setFillColor(WHITE)
-    cnv.drawString(PAGE_MARGIN, page_h - 15 * mm, "Ladekosten-Nachweis")
+    cnv.drawString(PAGE_MARGIN, page_h - 15 * mm, r["attachment_cover_title"])
     cnv.setFont(FONT_REGULAR, 9.5)
     cnv.setFillColor(colors.HexColor("#C7D2FE"))
-    cnv.drawString(PAGE_MARGIN, page_h - 21.5 * mm, "Laden des Dienstwagens am privaten Anschluss")
+    cnv.drawString(PAGE_MARGIN, page_h - 21.5 * mm, r["attachment_cover_subtitle"])
     cnv.setFont(FONT_BOLD, 12)
     cnv.setFillColor(WHITE)
     cnv.drawRightString(page_w - PAGE_MARGIN, page_h - 15 * mm, period_label)
     cnv.setFont(FONT_REGULAR, 8.5)
     cnv.setFillColor(colors.HexColor("#C7D2FE"))
-    cnv.drawRightString(page_w - PAGE_MARGIN, page_h - 21.5 * mm, "Zeitraum")
+    cnv.drawRightString(page_w - PAGE_MARGIN, page_h - 21.5 * mm, r["attachment_period"])
 
     center_y = page_h / 2
     cnv.setFillColor(ACCENT)
     cnv.setFont(FONT_BOLD, 11)
-    cnv.drawCentredString(page_w / 2, center_y + 22 * mm, "ANLAGE")
+    cnv.drawCentredString(page_w / 2, center_y + 22 * mm, r["attachment_label"])
     cnv.setFillColor(NAVY)
     cnv.setFont(FONT_BOLD, 18)
-    cnv.drawCentredString(page_w / 2, center_y + 10 * mm, "Tarifnachweis")
+    cnv.drawCentredString(page_w / 2, center_y + 10 * mm, r["attachment_tariff_receipt"])
 
     cnv.setFont(FONT_REGULAR, 11)
     cnv.setFillColor(NAVY_SOFT)
-    price_label = f"{period['price']:.4f}".replace(".", ",")
+    price_label = i18n.fmt_number(period["price"], 4, locale)
     cnv.drawCentredString(
         page_w / 2, center_y - 2 * mm,
-        f"Gültig ab {period['start_date'].strftime('%d.%m.%Y')} · {price_label} €/kWh",
+        i18n.t(
+            locale, "report.attachment_valid_from",
+            date=i18n.fmt_date(period["start_date"], locale), price=price_label,
+        ),
     )
     if original_filename:
         cnv.setFont(FONT_REGULAR, 9)
         cnv.setFillColor(GREY_TEXT)
-        cnv.drawCentredString(page_w / 2, center_y - 9 * mm, f"Hochgeladene Datei: {original_filename}")
+        cnv.drawCentredString(
+            page_w / 2, center_y - 9 * mm,
+            i18n.t(locale, "report.attachment_uploaded_file", name=original_filename),
+        )
 
     cnv.setFont(FONT_REGULAR, 7.5)
     cnv.setFillColor(GREY_TEXT)
-    cnv.drawCentredString(
-        page_w / 2, 20 * mm,
-        "Vom Nutzer hochgeladener Beleg, unverändert angehängt.",
-    )
+    cnv.drawCentredString(page_w / 2, 20 * mm, r["attachment_footer"])
     cnv.save()
     return buf.getvalue()
 
 
-def _make_chart(sessions_sorted: list[dict]) -> Drawing:
+def _make_chart(sessions_sorted: list[dict], locale: str = "en") -> Drawing:
     labels = []
     values = []
+    date_fmt = "%d.%m." if locale == "de" else "%m/%d"
     for s in sessions_sorted:
         try:
             dt = parse_iso(s["created"])
         except (KeyError, ValueError):
             continue
-        labels.append(dt.strftime("%d.%m."))
+        labels.append(dt.strftime(date_fmt))
         values.append(round(s.get("chargedEnergy", 0.0) or 0.0, 1))
 
-    # Bei vielen Ladevorgängen nur jedes n-te Datum beschriften, sonst
-    # überlappen sich die Achsenbeschriftungen unleserlich.
+    # With many charging sessions, label only every nth date - otherwise the
+    # axis labels overlap and become unreadable.
     step = max(1, -(-len(labels) // 12))  # ceil(len/12)
     labels = [lab if i % step == 0 else "" for i, lab in enumerate(labels)]
 
@@ -370,41 +380,40 @@ def build_pdf(
     tariff_periods: list[dict] | None = None,
     footnote: str | None = None,
     include_chart: bool = False,
+    locale: str = "en",
 ) -> dict:
-    """Baut das PDF und gibt eine kleine Zusammenfassung (Summen, Warnungen) zurück.
+    """Builds the PDF and returns a small summary (totals, warnings).
 
-    ``tariff_periods`` ist die Tarifhistorie für Methode "actual": eine Liste von
-    {"start_date": date, "price": float}. Pro Ladevorgang wird der zum jeweiligen
-    Ladedatum gültige Satz angewandt (siehe ``resolve_tariff``) und als eigene
-    Spalte in der Tabelle ausgewiesen. Für Methode "pauschale" wird sie ignoriert.
+    ``tariff_periods`` is the tariff history for method "actual": a list of
+    {"start_date": date, "price": float}. For each charging session, the rate
+    in effect on that date is applied (see ``resolve_tariff``) and shown as
+    its own column in the table. It is ignored for method "pauschale".
 
-    ``footnote`` überschreibt den Standardtext unterhalb der Tabelle (z. B. um
-    eine unternehmensspezifische Formulierung zu hinterlegen). Wird nichts
-    übergeben oder ein leerer String, greift der automatisch aus der
-    Berechnungsmethode abgeleitete Standardtext.
+    ``footnote`` overrides the default text shown below the table (e.g. to
+    use company-specific wording). If nothing is passed, or an empty string,
+    the default text derived from the calculation method applies.
 
-    ``include_chart`` steuert, ob das Verlaufsdiagramm mit ausgegeben wird
-    (Standard: nein).
+    ``include_chart`` controls whether the trend chart is included
+    (default: no).
+
+    ``locale`` selects the language used for every label in the PDF
+    (see app/locales/*.yaml); defaults to English.
     """
     styles = _styles()
-    period_label = f"{MONTH_NAMES_DE[month]} {year}"
+    r = i18n.strings(locale)["report"]
+    period_label = f"{_month_name(month, locale)} {year}"
 
     method_footnote = (
-        "Berechnungsgrundlage: BMF-Schreiben vom 11.11.2025 (Strompreispauschale)"
-        if method == "pauschale"
-        else "Berechnungsgrundlage: nachgewiesener Haushaltstarif (BMF-Schreiben vom 11.11.2025)"
+        r["footnote_flat"] if method == "pauschale" else r["footnote_actual"]
     )
-    default_footnote_text = (
-        f"{method_footnote}. Angaben auf Basis der Zählerdaten der Wallbox (evcc). "
-        "Keine steuerliche Beratung."
-    )
+    default_footnote_text = f"{method_footnote}. {r['default_footnote_suffix']}"
 
-    # ---- Header/Footer, auf jeder Seite identisch -------------------------
+    # ---- Header/footer, identical on every page ---------------------------
     def draw_header_footer(cnv: pdfcanvas.Canvas, doc) -> None:
         page_w, page_h = A4
         cnv.saveState()
 
-        # Kopfband
+        # Header band
         cnv.setFillColor(NAVY)
         cnv.rect(0, page_h - HEADER_HEIGHT, page_w, HEADER_HEIGHT, stroke=0, fill=1)
         cnv.setFillColor(ACCENT)
@@ -412,29 +421,33 @@ def build_pdf(
 
         cnv.setFont(FONT_BOLD, 16)
         cnv.setFillColor(WHITE)
-        cnv.drawString(PAGE_MARGIN, page_h - 15 * mm, "Ladekosten-Nachweis")
+        cnv.drawString(PAGE_MARGIN, page_h - 15 * mm, r["header_title"])
 
         cnv.setFont(FONT_REGULAR, 9.5)
         cnv.setFillColor(colors.HexColor("#C7D2FE"))
-        cnv.drawString(PAGE_MARGIN, page_h - 21.5 * mm, "Laden des Dienstwagens am privaten Anschluss")
+        cnv.drawString(PAGE_MARGIN, page_h - 21.5 * mm, r["header_subtitle"])
 
         cnv.setFont(FONT_BOLD, 12)
         cnv.setFillColor(WHITE)
         cnv.drawRightString(page_w - PAGE_MARGIN, page_h - 15 * mm, period_label)
         cnv.setFont(FONT_REGULAR, 8.5)
         cnv.setFillColor(colors.HexColor("#C7D2FE"))
-        cnv.drawRightString(page_w - PAGE_MARGIN, page_h - 21.5 * mm, "Zeitraum")
+        cnv.drawRightString(page_w - PAGE_MARGIN, page_h - 21.5 * mm, r["period_label"])
 
-        # Fußzeile
+        # Footer
         cnv.setStrokeColor(GREY_LINE)
         cnv.setLineWidth(0.5)
         cnv.line(PAGE_MARGIN, FOOTER_HEIGHT, page_w - PAGE_MARGIN, FOOTER_HEIGHT)
         cnv.setFont(FONT_REGULAR, 7)
         cnv.setFillColor(GREY_TEXT)
-        cnv.drawString(PAGE_MARGIN, FOOTER_HEIGHT - 5 * mm,
-                        f"Erstellt am {datetime.now().strftime('%d.%m.%Y %H:%M')} · Datenquelle: evcc")
-        cnv.drawRightString(page_w - PAGE_MARGIN, FOOTER_HEIGHT - 5 * mm,
-                             f"Seite {doc.page}")
+        cnv.drawString(
+            PAGE_MARGIN, FOOTER_HEIGHT - 5 * mm,
+            i18n.t(locale, "report.footer_created", date=i18n.fmt_datetime(datetime.now(), locale)),
+        )
+        cnv.drawRightString(
+            page_w - PAGE_MARGIN, FOOTER_HEIGHT - 5 * mm,
+            i18n.t(locale, "report.footer_page", page=doc.page),
+        )
         cnv.restoreState()
 
     main_buffer = BytesIO()
@@ -445,21 +458,21 @@ def build_pdf(
         bottomMargin=FOOTER_HEIGHT + 4 * mm,
         leftMargin=PAGE_MARGIN,
         rightMargin=PAGE_MARGIN,
-        title=f"Ladekosten-Nachweis {month:02d}/{year}",
-        author="evcc Ladekosten-Report",
+        title=i18n.t(locale, "report.pdf_title", month=month, year=year),
+        author=r["pdf_author"],
     )
 
     story = []
 
-    # ---- Sessions verarbeiten (vor dem Meta-Header, da Methode-Label und
-    #      KPI-Kacheln von den Ergebnissen abhängen) -------------------------
+    # ---- Process sessions (before the meta header, since the method label
+    #      and KPI tiles depend on the results) -----------------------------
     sessions_sorted = sorted(sessions, key=lambda s: s.get("created", ""))
     rows = []
     total_kwh = 0.0
     total_amount = 0.0
     warnings = []
     used_rates: set[float] = set()
-    used_period_keys: set = set()  # Startdaten der tatsächlich herangezogenen Tarifperioden
+    used_period_keys: set = set()  # start dates of the tariff periods actually used
 
     for s in sessions_sorted:
         try:
@@ -475,28 +488,30 @@ def build_pdf(
         if method == "pauschale":
             rate = rate_ct_per_kwh / 100.0
         else:
-            rate, used_period, tariff_warning = resolve_tariff(start_dt.date(), tariff_periods or [])
+            rate, used_period, tariff_warning = resolve_tariff(
+                start_dt.date(), tariff_periods or [], locale
+            )
             if used_period is not None:
                 used_period_keys.add(used_period["start_date"])
             if tariff_warning:
-                warnings.append(f"{start_dt.strftime('%d.%m.%Y')}: {tariff_warning}")
+                warnings.append(f"{i18n.fmt_date(start_dt, locale)}: {tariff_warning}")
         amount = compute_amount(energy, rate)
         used_rates.add(round(rate, 6))
 
         total_kwh += energy
         total_amount += amount
 
-        issue = check_plausibility(s)
+        issue = check_plausibility(s, locale)
         if issue:
-            warnings.append(f"{start_dt.strftime('%d.%m.%Y')}: {issue}")
+            warnings.append(f"{i18n.fmt_date(start_dt, locale)}: {issue}")
 
         rows.append((start_dt, end_dt, meter_start, meter_stop, energy, amount, rate))
 
-    # ---- Relevante Tarifperioden + deren Nachweis-PDFs (nur Methode "actual") --
-    # Wichtig: Zuordnung über die tatsächlich verwendete Periode (Startdatum),
-    # NICHT über den Preis - sonst würde eine zufällig preisgleiche, aber nie
-    # herangezogene Periode fälschlich mit aufgeführt (z. B. ein alter
-    # Sammel-Eintrag mit demselben Cent-Betrag wie der wirklich gültige).
+    # ---- Relevant tariff periods + their receipt PDFs (method "actual" only) --
+    # Important: match via the period actually used (start date), NOT via the
+    # price - otherwise a period that happens to share the same price but was
+    # never applied would be incorrectly listed too (e.g. an old bulk entry
+    # with the same cent amount as the one that's actually in effect).
     relevant_periods = []
     periods_with_docs = []
     if method == "actual":
@@ -509,31 +524,33 @@ def build_pdf(
             if not doc_path:
                 continue
             try:
-                PdfReader(doc_path)  # nur zur Validierung, dass die Datei lesbar ist
+                PdfReader(doc_path)  # only to validate that the file is readable
             except Exception:
                 warnings.append(
-                    f"Tarifnachweis ab {p['start_date'].strftime('%d.%m.%Y')} konnte nicht gelesen "
-                    "werden (Datei beschädigt oder kein gültiges PDF) und wurde nicht angehängt."
+                    i18n.t(
+                        locale, "report.tariff_receipt_unreadable",
+                        date=i18n.fmt_date(p["start_date"], locale),
+                    )
                 )
                 continue
             periods_with_docs.append(p)
 
     if method == "pauschale":
-        method_label = f"Strompreispauschale · {rate_ct_per_kwh:.0f} ct/kWh"
+        method_label = i18n.t(locale, "report.method_flat_label", rate=rate_ct_per_kwh)
     elif len(used_rates) == 1:
-        rate_label = f"{next(iter(used_rates)):.4f}".replace(".", ",")
-        method_label = f"Tatsächliche Kosten · {rate_label} €/kWh"
+        rate_label = i18n.fmt_number(next(iter(used_rates)), 4, locale)
+        method_label = i18n.t(locale, "report.method_actual_label_single", rate=rate_label)
     elif len(used_rates) > 1:
-        method_label = "Tatsächliche Kosten · mehrere Tarife im Zeitraum (siehe Tabelle)"
+        method_label = r["method_actual_label_multi"]
     else:
-        method_label = "Tatsächliche Kosten"
+        method_label = r["method_actual_label_none"]
 
-    # ---- Meta-Zeile: Mitarbeiter / Fahrzeug / Methode ----------------------
+    # ---- Meta row: employee / vehicle / method -----------------------------
     meta_table = Table(
         [[
-            Paragraph("MITARBEITER/IN", styles["label"]),
-            Paragraph("FAHRZEUG", styles["label"]),
-            Paragraph("BERECHNUNGSMETHODE", styles["label"]),
+            Paragraph(r["meta_employee"], styles["label"]),
+            Paragraph(r["meta_vehicle"], styles["label"]),
+            Paragraph(r["meta_method"], styles["label"]),
         ], [
             Paragraph(employee or "—", styles["value"]),
             Paragraph(vehicle or "—", styles["value"]),
@@ -552,12 +569,12 @@ def build_pdf(
     story.append(HRFlowable(width="100%", thickness=0.6, color=GREY_LINE))
     story.append(Spacer(1, 4 * mm))
 
-    # ---- KPI-Kacheln --------------------------------------------------------
+    # ---- KPI tiles ------------------------------------------------------------
     kpi_row = Table(
         [[
-            _kpi_card(str(len(rows)), "LADEVORGÄNGE", styles),
-            _kpi_card(f"{total_kwh:.2f} kWh".replace(".", ","), "GELADENE ENERGIE", styles),
-            _kpi_card(f"{total_amount:.2f} €".replace(".", ","), "ERSTATTUNGSBETRAG", styles, accent=True),
+            _kpi_card(str(len(rows)), r["kpi_sessions"], styles),
+            _kpi_card(f"{i18n.fmt_number(total_kwh, 2, locale)} kWh", r["kpi_energy"], styles),
+            _kpi_card(i18n.fmt_currency(total_amount, locale), r["kpi_amount"], styles, accent=True),
         ]],
         colWidths=[58 * mm, 58 * mm, 58 * mm],
         spaceBefore=0,
@@ -573,22 +590,22 @@ def build_pdf(
     story.append(kpi_row)
     story.append(Spacer(1, 5 * mm))
 
-    # ---- Detailtabelle -------------------------------------------------------
-    story.append(Paragraph("LADEVORGÄNGE IM ZEITRAUM", styles["section"]))
+    # ---- Detail table -----------------------------------------------------------
+    story.append(Paragraph(r["section_sessions"], styles["section"]))
     story.append(Spacer(1, 3 * mm))
 
     header = [
-        Paragraph("Datum", styles["cell_head"]),
-        Paragraph("Beginn", styles["cell_head"]),
-        Paragraph("Ende", styles["cell_head"]),
-        Paragraph("Zähler Start (kWh)", styles["cell_head_num"]),
-        Paragraph("Zähler Ende (kWh)", styles["cell_head_num"]),
-        Paragraph("Geladen (kWh)", styles["cell_head_num"]),
+        Paragraph(r["col_date"], styles["cell_head"]),
+        Paragraph(r["col_start"], styles["cell_head"]),
+        Paragraph(r["col_end"], styles["cell_head"]),
+        Paragraph(r["col_meter_start"], styles["cell_head_num"]),
+        Paragraph(r["col_meter_end"], styles["cell_head_num"]),
+        Paragraph(r["col_charged"], styles["cell_head_num"]),
     ]
     show_rate_column = method == "actual"
     if show_rate_column:
-        header.append(Paragraph("Satz (€/kWh)", styles["cell_head_num"]))
-    header.append(Paragraph("Betrag (EUR)", styles["cell_head_num"]))
+        header.append(Paragraph(r["col_rate"], styles["cell_head_num"]))
+    header.append(Paragraph(r["col_amount"], styles["cell_head_num"]))
 
     table_data = [header]
     overnight_present = False
@@ -596,27 +613,28 @@ def build_pdf(
     for start_dt, end_dt, meter_start, meter_stop, energy, amount, rate in rows:
         day_diff = (end_dt.date() - start_dt.date()).days
         overnight_present = overnight_present or day_diff > 0
-        end_label = end_dt.strftime("%H:%M") + (f" +{day_diff}" if day_diff > 0 else "")
+        end_label = i18n.fmt_time(end_dt) + (f" +{day_diff}" if day_diff > 0 else "")
         row_cells = [
-            Paragraph(start_dt.strftime("%d.%m.%Y"), styles["cell"]),
-            Paragraph(start_dt.strftime("%H:%M"), styles["cell"]),
+            Paragraph(i18n.fmt_date(start_dt, locale), styles["cell"]),
+            Paragraph(i18n.fmt_time(start_dt), styles["cell"]),
             Paragraph(end_label, styles["cell"]),
-            Paragraph(f"{meter_start:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                      if meter_start is not None else "–", styles["cell_num"]),
-            Paragraph(f"{meter_stop:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                      if meter_stop is not None else "–", styles["cell_num"]),
-            Paragraph(f"{energy:.2f}".replace(".", ","), styles["cell_num"]),
+            Paragraph(
+                i18n.fmt_number(meter_start, 2, locale) if meter_start is not None else "–",
+                styles["cell_num"],
+            ),
+            Paragraph(
+                i18n.fmt_number(meter_stop, 2, locale) if meter_stop is not None else "–",
+                styles["cell_num"],
+            ),
+            Paragraph(i18n.fmt_number(energy, 2, locale), styles["cell_num"]),
         ]
         if show_rate_column:
-            row_cells.append(Paragraph(f"{rate:.4f}".replace(".", ","), styles["cell_num"]))
-        row_cells.append(Paragraph(f"{amount:.2f}".replace(".", ","), styles["cell_num"]))
+            row_cells.append(Paragraph(i18n.fmt_number(rate, 4, locale), styles["cell_num"]))
+        row_cells.append(Paragraph(i18n.fmt_number(amount, 2, locale), styles["cell_num"]))
         table_data.append(row_cells)
 
     if len(table_data) == 1:
-        story.append(Paragraph(
-            "Keine Ladevorgänge im gewählten Zeitraum an den konfigurierten Home-Ladepunkten gefunden.",
-            styles["cell"],
-        ))
+        story.append(Paragraph(r["no_sessions"], styles["cell"]))
     else:
         if show_rate_column:
             col_widths = [23 * mm, 16 * mm, 22 * mm, 21 * mm, 21 * mm, 30 * mm, 17 * mm, 24 * mm]
@@ -639,23 +657,25 @@ def build_pdf(
         t.setStyle(TableStyle(row_styles))
         story.append(t)
 
-        # Summenzeile als eigene, optisch abgesetzte Tabelle
+        # Total row as its own, visually separated table
+        total_kwh_label = f"{i18n.fmt_number(total_kwh, 2, locale)} kWh"
+        total_amount_label = i18n.fmt_currency(total_amount, locale)
         if show_rate_column:
             sum_table = Table(
                 [[
-                    Paragraph("Summe", styles["sum_label"]),
-                    Paragraph(f"{total_kwh:.2f} kWh".replace(".", ","), styles["sum_value"]),
+                    Paragraph(r["sum_label"], styles["sum_label"]),
+                    Paragraph(total_kwh_label, styles["sum_value"]),
                     "",
-                    Paragraph(f"{total_amount:.2f} €".replace(".", ","), styles["sum_value"]),
+                    Paragraph(total_amount_label, styles["sum_value"]),
                 ]],
                 colWidths=[23 * mm + 16 * mm + 22 * mm + 21 * mm + 21 * mm, 30 * mm, 17 * mm, 24 * mm],
             )
         else:
             sum_table = Table(
                 [[
-                    Paragraph("Summe", styles["sum_label"]),
-                    Paragraph(f"{total_kwh:.2f} kWh".replace(".", ","), styles["sum_value"]),
-                    Paragraph(f"{total_amount:.2f} €".replace(".", ","), styles["sum_value"]),
+                    Paragraph(r["sum_label"], styles["sum_label"]),
+                    Paragraph(total_kwh_label, styles["sum_value"]),
+                    Paragraph(total_amount_label, styles["sum_value"]),
                 ]],
                 colWidths=[119 * mm, 27 * mm, 28 * mm],
             )
@@ -669,21 +689,21 @@ def build_pdf(
 
         if show_rate_column and len(used_rates) > 1 and relevant_periods:
             story.append(Spacer(1, 6 * mm))
-            tariff_block = [Paragraph("IM ZEITRAUM VERWENDETE TARIFE", styles["section"]),
+            tariff_block = [Paragraph(r["section_tariffs_used"], styles["section"]),
                              Spacer(1, 3 * mm)]
 
             tariff_header = [
-                Paragraph("Gültig ab", styles["cell_head"]),
-                Paragraph("Preis (€/kWh)", styles["cell_head_num"]),
-                Paragraph("Beleg", styles["cell_head"]),
+                Paragraph(r["col_valid_from"], styles["cell_head"]),
+                Paragraph(r["col_price"], styles["cell_head_num"]),
+                Paragraph(r["col_receipt"], styles["cell_head"]),
             ]
             tariff_rows = [tariff_header]
             for p in relevant_periods:
                 has_doc = p in periods_with_docs
                 tariff_rows.append([
-                    Paragraph(p["start_date"].strftime("%d.%m.%Y"), styles["cell"]),
-                    Paragraph(f"{p['price']:.4f}".replace(".", ","), styles["cell_num"]),
-                    Paragraph("siehe Anlage" if has_doc else "–", styles["cell"]),
+                    Paragraph(i18n.fmt_date(p["start_date"], locale), styles["cell"]),
+                    Paragraph(i18n.fmt_number(p["price"], 4, locale), styles["cell_num"]),
+                    Paragraph(r["receipt_see_attachment"] if has_doc else "–", styles["cell"]),
                 ])
             tariff_table = Table(tariff_rows, colWidths=[32 * mm, 32 * mm, 32 * mm])
             tariff_table.hAlign = "LEFT"
@@ -702,31 +722,25 @@ def build_pdf(
             story.append(KeepTogether(tariff_block))
         elif show_rate_column and len(used_rates) > 1:
             story.append(Spacer(1, 2 * mm))
-            story.append(Paragraph(
-                "Im Zeitraum wurden mehrere Tarife angewandt (siehe Spalte \"Satz\").",
-                styles["small"],
-            ))
+            story.append(Paragraph(r["multi_tariff_note"], styles["small"]))
 
         if overnight_present:
             story.append(Spacer(1, 2 * mm))
-            story.append(Paragraph(
-                "+N = Ladevorgang endet N Tag(e) nach dem Beginndatum (z. B. +1 = am Folgetag, +2 = zwei Tage später)",
-                styles["small"],
-            ))
+            story.append(Paragraph(r["overnight_note"], styles["small"]))
 
-    # ---- Verlaufsdiagramm (optional, Standard: aus) ---------------------------
+    # ---- Trend chart (optional, default: off) ---------------------------------
     if include_chart and len(rows) >= 2:
         story.append(Spacer(1, 5 * mm))
         story.append(KeepTogether([
-            Paragraph("VERLAUF GELADENE ENERGIE JE LADEVORGANG", styles["section"]),
+            Paragraph(r["chart_section"], styles["section"]),
             Spacer(1, 3 * mm),
-            _make_chart(sessions_sorted),
+            _make_chart(sessions_sorted, locale),
         ]))
 
-    # ---- Hinweise / Plausibilität ---------------------------------------------
+    # ---- Warnings / plausibility ------------------------------------------------
     if warnings:
         story.append(Spacer(1, 5 * mm))
-        warn_lines = [Paragraph("Zu prüfende Abweichungen", styles["warn_head"])]
+        warn_lines = [Paragraph(r["warnings_title"], styles["warn_head"])]
         for w in warnings:
             warn_lines.append(Paragraph(f"• {w}", styles["warn"]))
         warn_box = Table([[warn_lines]], colWidths=[174 * mm])
@@ -741,7 +755,7 @@ def build_pdf(
         ]))
         story.append(warn_box)
 
-    # ---- Footnote & Unterschrift -----------------------------------------------
+    # ---- Footnote & signature -----------------------------------------------
     story.append(Spacer(1, 5 * mm))
     story.append(Paragraph(
         footnote.strip() if footnote and footnote.strip() else default_footnote_text,
@@ -749,11 +763,10 @@ def build_pdf(
     ))
     if periods_with_docs:
         story.append(Spacer(1, 1.5 * mm))
-        anzahl = len(periods_with_docs)
+        count = len(periods_with_docs)
         text = (
-            "Tarifnachweis als Anlage beigefügt (siehe Ende dieses Dokuments)."
-            if anzahl == 1
-            else f"{anzahl} Tarifnachweise als Anlagen beigefügt (siehe Ende dieses Dokuments)."
+            r["attachment_single"] if count == 1
+            else i18n.t(locale, "report.attachment_multi", count=count)
         )
         story.append(Paragraph(text, styles["small"]))
     story.append(Spacer(1, 9 * mm))
@@ -763,8 +776,8 @@ def build_pdf(
             ["", ""],
             [HRFlowable(width="100%", thickness=0.6, color=colors.HexColor("#9CA3AF")),
              HRFlowable(width="100%", thickness=0.6, color=colors.HexColor("#9CA3AF"))],
-            [Paragraph("Ort, Datum", styles["sig_label"]),
-             Paragraph("Unterschrift Mitarbeiter/in", styles["sig_label"])],
+            [Paragraph(r["sig_place_date"], styles["sig_label"]),
+             Paragraph(r["sig_employee"], styles["sig_label"])],
         ],
         colWidths=[80 * mm, 80 * mm],
     )
@@ -784,7 +797,9 @@ def build_pdf(
         for page in PdfReader(main_buffer).pages:
             writer.add_page(page)
         for p in periods_with_docs:
-            cover_bytes = _build_attachment_cover(p, period_label, p.get("document_original_name"))
+            cover_bytes = _build_attachment_cover(
+                p, period_label, p.get("document_original_name"), locale
+            )
             for page in PdfReader(BytesIO(cover_bytes)).pages:
                 writer.add_page(page)
             for page in PdfReader(p["document_path"]).pages:

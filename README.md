@@ -1,13 +1,26 @@
-# evcc Ladekosten-Report
+# evcc Charging Cost Report
 
-Home-Assistant-Add-on, das die Ladevorgänge deiner evcc-Instanz (inkl. Zählerständen)
-als PDF aufbereitet — möglicherweise geeignet zur Einreichung beim Arbeitgeber für die Erstattung
-von Stromkosten beim Laden eines Dienstwagens zuhause.
+[🇬🇧 English](README.md) | [🇩🇪 Deutsch](README.de.md)
 
-Details siehe [DOCS.md](DOCS.md).
+Home Assistant add-on that turns the charging sessions of your evcc instance
+(incl. meter readings) into a PDF — suitable for submitting to your employer
+for reimbursement of electricity costs when charging a company car at home.
 
-## ☕ Unterstützen
+See [evcc_ladekosten/DOCS.md](evcc_ladekosten/DOCS.md) for details.
 
-Wenn dir das AddOn gefällt und du das Projekt unterstützen möchtest:
+## Installation
+
+In Home Assistant, go to **Settings → Add-ons → Add-on Store → ⋮ → Repositories**
+and add:
+
+```
+https://github.com/pjanfred/evcc_charging_protocol
+```
+
+The "evcc Charging Cost Report" add-on then appears in the store.
+
+## ☕ Support
+
+If you like the add-on and want to support the project:
 
 [![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/pjanfred)
