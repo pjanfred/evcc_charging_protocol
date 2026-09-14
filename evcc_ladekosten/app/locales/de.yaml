@@ -58,6 +58,7 @@ messages:
   file_not_found: "Datei nicht gefunden oder ungültig: {filename}"
   report_deleted: "Report {filename} gelöscht."
   delete_failed: "Löschen fehlgeschlagen: {error}"
+  delete_blocked_submitted: "Report {filename} ist als eingereicht markiert und kann nicht gelöscht werden."
   tariff_saved: "Tarif ab {date} gespeichert: {price} €/kWh."
   tariff_doc_uploaded: " Beleg hochgeladen."
   invalid_input: "Ungültige Eingabe (Datum: '{date}', Preis: '{price}'): {error}"
