@@ -19,7 +19,6 @@ options:
   evcc_url: "http://evcc.local:7070"
   vehicles: []
   method: "pauschale"
-  rate_ct_per_kwh: 0.0
   employee: "Jan"
   vehicle: ""
   language: "en"
@@ -33,7 +32,7 @@ schema:
   vehicles:
     - "str"
   method: "list(pauschale|actual)"
-  rate_ct_per_kwh: "float"
+  rate_ct_per_kwh: "float?"
   employee: "str?"
   vehicle: "str?"
   language: "list(en|de)"
